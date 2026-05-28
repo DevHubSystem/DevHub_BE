@@ -1,0 +1,6 @@
+spring:
+  config:
+    import: optional:file:.env.dev[.properties]
+app:
+  cookie:
+    secure: false
