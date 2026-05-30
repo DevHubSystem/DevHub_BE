@@ -2,8 +2,11 @@ package iuh.fit.devhub_be.workspace.service;
 
 import iuh.fit.devhub_be.auth.model.User;
 import iuh.fit.devhub_be.auth.repository.UserRepository;
+import iuh.fit.devhub_be.common.exception.BadRequestException;
+import iuh.fit.devhub_be.common.exception.ForbiddenException;
 import iuh.fit.devhub_be.common.exception.ResourceNotFoundException;
 import iuh.fit.devhub_be.common.exception.UnauthorizedException;
+import iuh.fit.devhub_be.workspace.dto.request.AddMemberRequest;
 import iuh.fit.devhub_be.workspace.dto.request.CreateWorkspaceRequest;
 import iuh.fit.devhub_be.workspace.dto.response.WorkspaceResponse;
 import iuh.fit.devhub_be.workspace.dto.response.WorkspaceSummaryResponse;
@@ -208,5 +211,137 @@ class WorkspaceServiceTest {
                 () -> workspaceService.listMine(userId));
 
         verify(workspaceRepository, never()).findAllByOwnerOrMember(any());
+    }
+
+    // ─── addMember() ─────────────────────────────────────────────────────────
+
+    @Test
+    void testAddMemberAsOwner_Success() {
+        UUID ownerId = UUID.randomUUID();
+        UUID workspaceId = UUID.randomUUID();
+        User owner = buildUser(ownerId, "duc");
+        User newMember = buildUser(UUID.randomUUID(), "lan");
+        Workspace workspace = buildWorkspace(workspaceId, owner);
+        AddMemberRequest request = new AddMemberRequest("lan@example.com");
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(userRepository.findByEmail("lan@example.com")).thenReturn(Optional.of(newMember));
+        when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkspaceResponse result = workspaceService.addMember(workspaceId, request, ownerId);
+
+        assertEquals(1, result.members().size());
+        assertEquals("lan", result.members().get(0).userName());
+        assertTrue(workspace.getMembers().contains(newMember));
+        verify(workspaceRepository, times(1)).save(workspace);
+    }
+
+    @Test
+    void testAddMemberWhenWorkspaceNotFound_ThrowsResourceNotFound() {
+        UUID workspaceId = UUID.randomUUID();
+        AddMemberRequest request = new AddMemberRequest("lan@example.com");
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
+                () -> workspaceService.addMember(workspaceId, request, UUID.randomUUID()));
+
+        assertEquals("Workspace not found", ex.getMessage());
+        verify(workspaceRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddMemberWhenCallerIsMemberNotOwner_ThrowsForbidden() {
+        UUID ownerId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        UUID workspaceId = UUID.randomUUID();
+        User owner = buildUser(ownerId, "duc");
+        User member = buildUser(memberId, "lan");
+        Workspace workspace = buildWorkspace(workspaceId, owner, member);
+        AddMemberRequest request = new AddMemberRequest("minh@example.com");
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+
+        // A member can read the workspace but cannot add members — 403, not a leak.
+        assertThrows(ForbiddenException.class,
+                () -> workspaceService.addMember(workspaceId, request, memberId));
+
+        verify(userRepository, never()).findByEmail(any());
+        verify(workspaceRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddMemberWhenCallerIsOutsider_ThrowsResourceNotFound() {
+        UUID ownerId = UUID.randomUUID();
+        UUID outsiderId = UUID.randomUUID();
+        UUID workspaceId = UUID.randomUUID();
+        User owner = buildUser(ownerId, "duc");
+        Workspace workspace = buildWorkspace(workspaceId, owner);
+        AddMemberRequest request = new AddMemberRequest("minh@example.com");
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+
+        // Outsider gets the same 404 as a missing workspace — no existence leak.
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
+                () -> workspaceService.addMember(workspaceId, request, outsiderId));
+
+        assertEquals("Workspace not found", ex.getMessage());
+        verify(userRepository, never()).findByEmail(any());
+        verify(workspaceRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddMemberWhenTargetUserNotFound_ThrowsResourceNotFound() {
+        UUID ownerId = UUID.randomUUID();
+        UUID workspaceId = UUID.randomUUID();
+        User owner = buildUser(ownerId, "duc");
+        Workspace workspace = buildWorkspace(workspaceId, owner);
+        AddMemberRequest request = new AddMemberRequest("ghost@example.com");
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
+                () -> workspaceService.addMember(workspaceId, request, ownerId));
+
+        assertEquals("User not found", ex.getMessage());
+        verify(workspaceRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddMemberWhenTargetIsOwner_ThrowsBadRequest() {
+        UUID ownerId = UUID.randomUUID();
+        UUID workspaceId = UUID.randomUUID();
+        User owner = buildUser(ownerId, "duc");
+        Workspace workspace = buildWorkspace(workspaceId, owner);
+        AddMemberRequest request = new AddMemberRequest("duc@example.com");
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(userRepository.findByEmail("duc@example.com")).thenReturn(Optional.of(owner));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> workspaceService.addMember(workspaceId, request, ownerId));
+
+        assertEquals("Owner is already a member of the workspace", ex.getMessage());
+        verify(workspaceRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddMemberWhenTargetAlreadyMember_ThrowsBadRequest() {
+        UUID ownerId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        UUID workspaceId = UUID.randomUUID();
+        User owner = buildUser(ownerId, "duc");
+        User member = buildUser(memberId, "lan");
+        Workspace workspace = buildWorkspace(workspaceId, owner, member);
+        AddMemberRequest request = new AddMemberRequest("lan@example.com");
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(userRepository.findByEmail("lan@example.com")).thenReturn(Optional.of(member));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> workspaceService.addMember(workspaceId, request, ownerId));
+
+        assertEquals("User is already a member of the workspace", ex.getMessage());
+        verify(workspaceRepository, never()).save(any());
     }
 }

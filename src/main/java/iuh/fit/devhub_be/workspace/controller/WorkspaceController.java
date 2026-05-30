@@ -1,6 +1,7 @@
 package iuh.fit.devhub_be.workspace.controller;
 
 import iuh.fit.devhub_be.common.dto.ApiResponse;
+import iuh.fit.devhub_be.workspace.dto.request.AddMemberRequest;
 import iuh.fit.devhub_be.workspace.dto.request.CreateWorkspaceRequest;
 import iuh.fit.devhub_be.workspace.dto.response.WorkspaceResponse;
 import iuh.fit.devhub_be.workspace.dto.response.WorkspaceSummaryResponse;
@@ -45,6 +46,15 @@ public class WorkspaceController {
             @AuthenticationPrincipal Jwt jwt) {
         List<WorkspaceSummaryResponse> workspaces = workspaceService.listMine(currentUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success(workspaces));
+    }
+
+    @PostMapping("/{id}/members")
+    public ResponseEntity<ApiResponse<WorkspaceResponse>> addMember(
+            @PathVariable UUID id,
+            @RequestBody @Valid AddMemberRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        WorkspaceResponse updated = workspaceService.addMember(id, request, currentUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(updated, "Member added successfully"));
     }
 
     private UUID currentUserId(Jwt jwt) {

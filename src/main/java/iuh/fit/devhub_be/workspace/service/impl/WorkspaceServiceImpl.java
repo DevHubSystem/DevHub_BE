@@ -2,8 +2,11 @@ package iuh.fit.devhub_be.workspace.service.impl;
 
 import iuh.fit.devhub_be.auth.model.User;
 import iuh.fit.devhub_be.auth.repository.UserRepository;
+import iuh.fit.devhub_be.common.exception.BadRequestException;
+import iuh.fit.devhub_be.common.exception.ForbiddenException;
 import iuh.fit.devhub_be.common.exception.ResourceNotFoundException;
 import iuh.fit.devhub_be.common.exception.UnauthorizedException;
+import iuh.fit.devhub_be.workspace.dto.request.AddMemberRequest;
 import iuh.fit.devhub_be.workspace.dto.request.CreateWorkspaceRequest;
 import iuh.fit.devhub_be.workspace.dto.response.UserSummary;
 import iuh.fit.devhub_be.workspace.dto.response.WorkspaceResponse;
@@ -62,12 +65,43 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .toList();
     }
 
-    private boolean hasAccess(Workspace workspace, UUID userId) {
-        if (workspace.getOwner().getId().equals(userId)) {
-            return true;
+    @Override
+    @Transactional
+    public WorkspaceResponse addMember(UUID workspaceId, AddMemberRequest request, UUID currentUserId) {
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
+
+        // Owner-only write. A member (who can already read the workspace) gets 403;
+        // an outsider gets the same 404 as a missing workspace — no existence leak.
+        if (!workspace.getOwner().getId().equals(currentUserId)) {
+            if (isMember(workspace, currentUserId)) {
+                throw new ForbiddenException("Only the workspace owner can add members");
+            }
+            throw new ResourceNotFoundException("Workspace not found");
         }
+
+        User target = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (workspace.getOwner().getId().equals(target.getId())) {
+            throw new BadRequestException("Owner is already a member of the workspace");
+        }
+        if (isMember(workspace, target.getId())) {
+            throw new BadRequestException("User is already a member of the workspace");
+        }
+
+        workspace.getMembers().add(target);
+        Workspace saved = workspaceRepository.save(workspace);
+        return toResponse(saved);
+    }
+
+    private boolean isMember(Workspace workspace, UUID userId) {
         return workspace.getMembers().stream()
                 .anyMatch(member -> member.getId().equals(userId));
+    }
+
+    private boolean hasAccess(Workspace workspace, UUID userId) {
+        return workspace.getOwner().getId().equals(userId) || isMember(workspace, userId);
     }
 
     private User getUser(UUID userId) {
