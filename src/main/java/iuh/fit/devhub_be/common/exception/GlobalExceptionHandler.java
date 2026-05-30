@@ -2,6 +2,7 @@ package iuh.fit.devhub_be.common.exception;
 
 import iuh.fit.devhub_be.common.dto.ErrorResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +39,14 @@ public class GlobalExceptionHandler {
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
         return build(ErrorCode.VALIDATION_ERROR, message);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException ex) {
+        // Malformed/missing/unreadable request body (e.g. invalid JSON). The parser
+        // detail is omitted from the response to avoid leaking internals; it stays in
+        // the logs via Spring's ExceptionHandlerExceptionResolver.
+        return build(ErrorCode.BAD_REQUEST, "Malformed or unreadable request body");
     }
 
     @ExceptionHandler(Exception.class)
