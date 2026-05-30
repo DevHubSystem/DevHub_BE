@@ -37,7 +37,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     // Self-contained mapper (findAndAddModules picks up JavaTimeModule so Instant
     // serializes as ISO-8601). Kept independent of the MVC ObjectMapper bean so the
     // handler has no auto-configuration ordering dependency.
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     /** userId -> open sessions (a user may have multiple tabs/devices). */
     private final Map<UUID, Set<WebSocketSession>> sessionsByUser = new ConcurrentHashMap<>();
