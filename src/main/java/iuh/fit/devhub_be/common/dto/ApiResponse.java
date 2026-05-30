@@ -10,17 +10,13 @@ public record ApiResponse<T>(
         boolean success,
         T data,
         String message,
-        Instant timestamp
+        String timestamp
 ) {
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, data, null, Instant.now());
+        return new ApiResponse<>(true, data, null, Instant.now().toString());
     }
 
     public static <T> ApiResponse<T> success(T data, String message) {
-        return new ApiResponse<>(true, data, message, Instant.now());
-    }
-
-    public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, null, message, Instant.now());
+        return new ApiResponse<>(true, data, message, Instant.now().toString());
     }
 }
