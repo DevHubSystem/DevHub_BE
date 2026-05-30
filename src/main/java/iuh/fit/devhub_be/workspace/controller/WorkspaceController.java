@@ -33,11 +33,11 @@ public class WorkspaceController {
                 .body(ApiResponse.success(created, "Workspace created successfully"));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<WorkspaceResponse>> getById(
-            @PathVariable UUID id,
+    @GetMapping("/{reminderKey}")
+    public ResponseEntity<ApiResponse<WorkspaceResponse>> getByReminderKey(
+            @PathVariable String reminderKey,
             @AuthenticationPrincipal Jwt jwt) {
-        WorkspaceResponse workspace = workspaceService.getById(id, currentUserId(jwt));
+        WorkspaceResponse workspace = workspaceService.getByReminderKey(reminderKey, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success(workspace));
     }
 
@@ -48,12 +48,12 @@ public class WorkspaceController {
         return ResponseEntity.ok(ApiResponse.success(workspaces));
     }
 
-    @PostMapping("/{id}/members")
+    @PostMapping("/{reminderKey}/members")
     public ResponseEntity<ApiResponse<WorkspaceResponse>> addMember(
-            @PathVariable UUID id,
+            @PathVariable String reminderKey,
             @RequestBody @Valid AddMemberRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        WorkspaceResponse updated = workspaceService.addMember(id, request, currentUserId(jwt));
+        WorkspaceResponse updated = workspaceService.addMember(reminderKey, request, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success(updated, "Member added successfully"));
     }
 

@@ -35,7 +35,12 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     public WorkspaceResponse create(CreateWorkspaceRequest request, UUID ownerId) {
         User owner = getUser(ownerId);
 
+        if (workspaceRepository.existsByReminderKey(request.reminderKey())) {
+            throw new BadRequestException("Reminder key is already in use");
+        }
+
         Workspace workspace = new Workspace();
+        workspace.setReminderKey(request.reminderKey());
         workspace.setName(request.name());
         workspace.setDescription(request.description());
         workspace.setOwner(owner);
@@ -46,8 +51,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(readOnly = true)
-    public WorkspaceResponse getById(UUID workspaceId, UUID currentUserId) {
-        Workspace workspace = workspaceRepository.findById(workspaceId)
+    public WorkspaceResponse getByReminderKey(String reminderKey, UUID currentUserId) {
+        Workspace workspace = workspaceRepository.findByReminderKey(reminderKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         // Unauthorized callers get the same 404 as a missing workspace (no existence leak).
@@ -69,8 +74,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional
-    public WorkspaceResponse addMember(UUID workspaceId, AddMemberRequest request, UUID currentUserId) {
-        Workspace workspace = workspaceRepository.findById(workspaceId)
+    public WorkspaceResponse addMember(String reminderKey, AddMemberRequest request, UUID currentUserId) {
+        Workspace workspace = workspaceRepository.findByReminderKey(reminderKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         // Owner-only write. A member (who can already read the workspace) gets 403;
@@ -121,6 +126,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .toList();
         return new WorkspaceResponse(
                 workspace.getId(),
+                workspace.getReminderKey(),
                 workspace.getName(),
                 workspace.getDescription(),
                 toUserSummary(workspace.getOwner()),
@@ -133,6 +139,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private WorkspaceSummaryResponse toSummary(Workspace workspace) {
         return new WorkspaceSummaryResponse(
                 workspace.getId(),
+                workspace.getReminderKey(),
                 workspace.getName(),
                 workspace.getDescription(),
                 toUserSummary(workspace.getOwner()),

@@ -9,6 +9,7 @@ import java.util.UUID;
  */
 public record WorkspaceResponse(
         UUID id,
+        String reminderKey,
         String name,
         String description,
         UserSummary owner,

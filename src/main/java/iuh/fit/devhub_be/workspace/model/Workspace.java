@@ -23,6 +23,13 @@ public class Workspace extends BaseEntity {
     @EqualsAndHashCode.Include
     private UUID id = UuidCreator.getTimeOrdered();
 
+    /**
+     * Human-facing unique identifier used in URLs for CRUD instead of the UUID id.
+     * Exactly 6 chars, uppercase letters + digits, at least one letter (e.g. "DEV001").
+     */
+    @Column(nullable = false, unique = true, length = 6)
+    private String reminderKey;
+
     @Column(nullable = false)
     private String name;
 
