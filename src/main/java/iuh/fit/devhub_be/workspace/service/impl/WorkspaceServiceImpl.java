@@ -6,6 +6,7 @@ import iuh.fit.devhub_be.common.exception.BadRequestException;
 import iuh.fit.devhub_be.common.exception.ForbiddenException;
 import iuh.fit.devhub_be.common.exception.ResourceNotFoundException;
 import iuh.fit.devhub_be.common.exception.UnauthorizedException;
+import iuh.fit.devhub_be.notification.service.NotificationService;
 import iuh.fit.devhub_be.workspace.dto.request.AddMemberRequest;
 import iuh.fit.devhub_be.workspace.dto.request.CreateWorkspaceRequest;
 import iuh.fit.devhub_be.workspace.dto.response.UserSummary;
@@ -27,6 +28,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -92,6 +94,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
         workspace.getMembers().add(target);
         Workspace saved = workspaceRepository.save(workspace);
+
+        // Notify the newly added member (persisted + pushed over WebSocket).
+        notificationService.notifyWorkspaceMemberAdded(target, saved.getId(), saved.getName());
+
         return toResponse(saved);
     }
 

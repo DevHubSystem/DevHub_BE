@@ -6,6 +6,7 @@ import iuh.fit.devhub_be.common.exception.BadRequestException;
 import iuh.fit.devhub_be.common.exception.ForbiddenException;
 import iuh.fit.devhub_be.common.exception.ResourceNotFoundException;
 import iuh.fit.devhub_be.common.exception.UnauthorizedException;
+import iuh.fit.devhub_be.notification.service.NotificationService;
 import iuh.fit.devhub_be.workspace.dto.request.AddMemberRequest;
 import iuh.fit.devhub_be.workspace.dto.request.CreateWorkspaceRequest;
 import iuh.fit.devhub_be.workspace.dto.response.WorkspaceResponse;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +35,7 @@ class WorkspaceServiceTest {
 
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private UserRepository userRepository;
+    @Mock private NotificationService notificationService;
 
     @InjectMocks
     private WorkspaceServiceImpl workspaceService;
@@ -234,6 +237,9 @@ class WorkspaceServiceTest {
         assertEquals("lan", result.members().get(0).userName());
         assertTrue(workspace.getMembers().contains(newMember));
         verify(workspaceRepository, times(1)).save(workspace);
+        // The newly added member is notified with the workspace's id + name.
+        verify(notificationService, times(1))
+                .notifyWorkspaceMemberAdded(eq(newMember), eq(workspaceId), eq("DevHub Team"));
     }
 
     @Test
